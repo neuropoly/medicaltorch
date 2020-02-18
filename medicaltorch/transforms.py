@@ -403,7 +403,7 @@ class RandomRotation(MTTransform):
 
     def __call__(self, sample, angle=None):
         rdict = {}
-        input_data = sample['input'][0]
+        #input_data = sample['input'][0]
 
         if angle is None:  # ie during "do transform" (vs "undo transform")
             angle = self.get_params(self.degrees)
