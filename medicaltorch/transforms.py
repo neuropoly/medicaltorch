@@ -408,6 +408,7 @@ class RandomRotation(MTTransform):
         if angle is None:  # ie during "do transform" (vs "undo transform")
             angle = self.get_params(self.degrees)
             # save angle in metadata
+            rdict['gt_metadata'] = {}
             rdict['gt_metadata']['randomRotation'] = angle
 
         for i in range(len(input_data)):
@@ -464,6 +465,7 @@ class RandomRotation3D(MTTransform):
         if angle is None:  # ie during "do transform" (vs "undo transform")
             angle = self.get_params(self.degrees)
             # save angle in metadata
+            rdict['gt_metadata'] = {}
             rdict['gt_metadata']['randomRotation'] = angle
 
         input_rotated = [np.zeros(input_data[0].shape, dtype=input_data.dtype) for i in range(len(input_data))]
