@@ -481,10 +481,6 @@ class RandomRotation3D(MTTransform):
             raise ValueError("Input of RandomRotation3D should be a 3 dimensionnal tensor.")
 
         angle = self.get_params(self.degrees)
-        # save angle in metadata
-        rdict['input_metadata'] = sample['input_metadata']
-        for i in range(len(input_data)):
-            rdict['input_metadata'][i]['randomRotation'] = angle
 
         input_rotated = [np.zeros(input_data[0].shape, dtype=input_data.dtype) for i in range(len(input_data))]
         gt_data = sample['gt'] if self.labeled else None
