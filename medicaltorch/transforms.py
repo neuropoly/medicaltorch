@@ -409,10 +409,9 @@ class RandomRotation(MTTransform):
         angle = self.get_params(self.degrees)
         # save angle in metadata
         rdict['input_metadata'] = sample['input_metadata']
-        for i in range(len(input_data)):
-            rdict['input_metadata'][i]['randomRotation'] = angle
 
         for i in range(len(input_data)):
+            rdict['input_metadata'][i]['randomRotation'] = angle
             input_data[i] = F.rotate(input_data[i], angle,
                                      self.resample, self.expand,
                                      self.center)
@@ -434,8 +433,9 @@ class RandomRotation(MTTransform):
         angle = - sample['input_metadata']['randomRotation']
 
         if isinstance(sample['input'], list):
+            rdict['inpu'] = sample['input']
             for i in range(len(sample['input'])):
-                rdict['input'] = F.rotate(sample['input'][i], angle,
+                rdict['input'][i] = F.rotate(sample['input'][i], angle,
                                      self.resample, self.expand,
                                      self.center)
         else:
