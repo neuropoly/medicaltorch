@@ -234,8 +234,9 @@ class CenterCrop2D(Crop2D):
     def undo_transform(self, sample):
         rdict = {}
         if isinstance(sample['input'], list):
+            rdict['input'] = sample['input']
             for i in range(len(sample['input'])):
-                rdict['input'] = self._uncrop(sample['input'][i], sample['input_metadata'][i]["__centercrop"])
+                rdict['input'][i] = self._uncrop(sample['input'][i], sample['input_metadata'][i]["__centercrop"])
         else:
             rdict['input'] = self._uncrop(sample['input'], sample['input_metadata']["__centercrop"])
 
