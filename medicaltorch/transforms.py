@@ -401,15 +401,15 @@ class RandomRotation(MTTransform):
         angle = np.random.uniform(degrees[0], degrees[1])
         return angle
 
-    def __call__(self, sample, angle=None):
+    def __call__(self, sample):
         rdict = {}
         input_data = sample['input']  #[0]
 
-        if angle is None:  # ie during "do transform" (vs "undo transform")
-            angle = self.get_params(self.degrees)
-            # save angle in metadata
-            rdict['gt_metadata'] = {}
-            rdict['gt_metadata']['randomRotation'] = angle
+        angle = self.get_params(self.degrees)
+        # save angle in metadata
+        rdict['input_metadata'] = sample['input_metadata']
+        for i in range(len(input_data)):
+            rdict['input_metadata'][i]['randomRotation'] = angle
 
         for i in range(len(input_data)):
             input_data[i] = F.rotate(input_data[i], angle,
@@ -428,8 +428,26 @@ class RandomRotation(MTTransform):
         return sample
 
     def undo_transform(self, sample):
-        # we apply the inverse rotation
-        return self.__call__(sample, - sample['gt_metadata']['randomRotation'])
+        rdict = {}
+
+        angle = - sample['input_metadata']['randomRotation']
+
+        if isinstance(sample['input'], list):
+            for i in range(len(sample['input'])):
+                rdict['input'] = F.rotate(sample['input'][i], angle,
+                                     self.resample, self.expand,
+                                     self.center)
+        else:
+            rdict['input'] = F.rotate(sample['input'], angle,
+                                     self.resample, self.expand,
+                                     self.center)
+
+        rdict['gt'] = F.rotate(sample['gt'], angle,
+                               self.resample, self.expand,
+                               self.center)
+
+        sample.update(rdict)
+        return sample
 
 
 class RandomRotation3D(MTTransform):
@@ -456,17 +474,17 @@ class RandomRotation3D(MTTransform):
         angle = np.random.uniform(degrees[0], degrees[1])
         return angle
 
-    def __call__(self, sample, angle=None):
+    def __call__(self, sample):
         rdict = {}
         input_data = sample['input']
         if len(sample['input'][0].shape) != 3:
             raise ValueError("Input of RandomRotation3D should be a 3 dimensionnal tensor.")
 
-        if angle is None:  # ie during "do transform" (vs "undo transform")
-            angle = self.get_params(self.degrees)
-            # save angle in metadata
-            rdict['gt_metadata'] = {}
-            rdict['gt_metadata']['randomRotation'] = angle
+        angle = self.get_params(self.degrees)
+        # save angle in metadata
+        rdict['input_metadata'] = sample['input_metadata']
+        for i in range(len(input_data)):
+            rdict['input_metadata'][i]['randomRotation'] = angle
 
         input_rotated = [np.zeros(input_data[0].shape, dtype=input_data.dtype) for i in range(len(input_data))]
         gt_data = sample['gt'] if self.labeled else None
@@ -495,10 +513,6 @@ class RandomRotation3D(MTTransform):
         sample.update(rdict)
 
         return sample
-
-    def undo_transform(self, sample):
-        # we apply the inverse rotation
-        return self.__call__(sample, - sample['gt_metadata']['randomRotation'])
 
 
 class RandomReverse3D(MTTransform):
