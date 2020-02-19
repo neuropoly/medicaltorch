@@ -430,15 +430,17 @@ class RandomRotation(MTTransform):
     def undo_transform(self, sample):
         rdict = {}
 
-        angle = - sample['input_metadata']['randomRotation']
-
         if isinstance(sample['input'], list):
+            angle = - sample['input_metadata'][0]['randomRotation']
+
             rdict['inpu'] = sample['input']
             for i in range(len(sample['input'])):
                 rdict['input'][i] = F.rotate(sample['input'][i], angle,
                                      self.resample, self.expand,
                                      self.center)
         else:
+            angle = - sample['input_metadata']['randomRotation']
+
             rdict['input'] = F.rotate(sample['input'], angle,
                                      self.resample, self.expand,
                                      self.center)
