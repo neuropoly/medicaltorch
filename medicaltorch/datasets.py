@@ -69,10 +69,10 @@ class SegmentationPair2D(object):
     :param canonical: canonical reordering of the volume axes.
     """
 
-    def __init__(self, input_filenames, gt_filename, metadata=None, cache=True, canonical=False):
+    def __init__(self, input_filenames, gt_filenames, metadata=None, cache=True, canonical=False):
 
         self.input_filenames = input_filenames
-        self.gt_filename = gt_filename
+        self.gt_filenames = gt_filenames
         self.metadata = metadata
         self.canonical = canonical
         self.cache = cache
@@ -87,17 +87,21 @@ class SegmentationPair2D(object):
             if len(input_img.shape) > 3:
                 raise RuntimeError("4-dimensional volumes not supported.")
 
-        # we consider only one gt per patient
+        # list of GT for multiclass segmentation
+        self.gt_handle = []
+
         # Unlabeled data (inference time)
-        if self.gt_filename is None:
-            self.gt_handle = None
-        else:
-            self.gt_handle = nib.load(self.gt_filename)
+        if self.gt_filenames is not None:
+            for gt in self.gt_filenames:
+                if gt is not None:
+                    self.gt_handle.append(nib.load(gt))
+                else:
+                    self.gt_handle.append(None)
 
         # Sanity check for dimensions, should be the same
         input_shape, gt_shape = self.get_pair_shapes()
 
-        if self.gt_handle is not None:
+        if self.gt_filenames is not None:
             if not np.allclose(input_shape, gt_shape):
                 raise RuntimeError('Input and ground truth with different dimensions.')
 
@@ -106,14 +110,16 @@ class SegmentationPair2D(object):
                 self.input_handle[idx] = nib.as_closest_canonical(handle)
 
             # Unlabeled data
-            if self.gt_handle is not None:
-                self.gt_handle = nib.as_closest_canonical(self.gt_handle)
+            if self.gt_filenames is not None:
+                for idx, gt in enumerate(self.gt_handle):
+                    if gt is not None:
+                        self.gt_handle[idx] = nib.as_closest_canonical(gt)
 
         if self.metadata:
             self.metadata = []
             for data, input_filename in zip(metadata, input_filenames):
                 data["input_filename"] = input_filename
-                data["gt_filename"] = gt_filename
+                data["gt_filenames"] = gt_filenames
                 self.metadata.append(data)
 
     def get_pair_shapes(self):
@@ -126,13 +132,16 @@ class SegmentationPair2D(object):
             if not len(set(input_shape)):
                 raise RuntimeError('Inputs have different dimensions.')
 
-        # Handle unlabeled data
-        if self.gt_handle is None:
-            gt_shape = None
-        else:
-            gt_shape = self.gt_handle.header.get_data_shape()
+        gt_shape = []
+            
+        for gt in self.gt_handle:
+            if gt is not None:
+                gt_shape.append(gt.header.get_data_shape())
 
-        return input_shape[0], gt_shape
+                if not len(set(gt_shape)):
+                    raise RuntimeError('Labels have different dimensions.')
+
+        return input_shape[0], gt_shape[0] if len(gt_shape) else None
 
     def get_pair_data(self):
         """Return the tuble (input, ground truth) with the data content in
@@ -253,11 +262,11 @@ class MRI2DSegmentationDataset(Dataset):
         self._load_filenames()
 
     def _load_filenames(self):
-        for input_filename, gt_filename, roi_filename, metadata in self.filename_pairs:
-            roi_pair = SegmentationPair2D(input_filename, roi_filename, metadata=metadata,
+        for input_filenames, gt_filenames, roi_filename, metadata in self.filename_pairs:
+            roi_pair = SegmentationPair2D(input_filenames, roi_filename, metadata=metadata,
                                           cache=self.cache, canonical=self.canonical)
 
-            seg_pair = SegmentationPair2D(input_filename, gt_filename, metadata=metadata,
+            seg_pair = SegmentationPair2D(input_filenames, gt_filenames, metadata=metadata,
                                           cache=self.cache, canonical=self.canonical)
 
             input_data_shape, _ = seg_pair.get_pair_shapes()
@@ -466,7 +475,6 @@ class MRI3DSubVolumeSegmentationDataset(MRI3DSegmentationDataset):
         self.padding = padding
         self.transform = transform
         self._prepare_indexes()
-        self._load_filenames()
 
     def _prepare_indexes(self):
         length = self.length
