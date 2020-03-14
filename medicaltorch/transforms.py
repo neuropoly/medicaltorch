@@ -125,9 +125,14 @@ class StackTensors(MTTransform):
 
     def __call__(self, sample):
         rdict = {}
-        input_data = sample['input']
-        rdict['input'] = torch.squeeze(torch.cat(input_data, dim=0))
-        sample.update(rdict)
+        if isinstance(sample['input'], list):
+            input_data = sample['input']
+            rdict['input'] = torch.squeeze(torch.cat(input_data, dim=0))
+            sample.update(rdict)
+        if isinstance(sample['gt'], list):
+            gt_data = sample['gt']
+            rdict['gt'] = torch.squeeze(torch.cat(gt_data, dim=0))
+            sample.update(rdict)
         return sample
 
 
@@ -372,7 +377,7 @@ class NormalizeInstance3D(MTTransform):
                                                     [std for _ in range(0, input_volume.shape[0])]).unsqueeze(0)
         rdict = {
             'input': input_data_normalized,
-            'gt': sample['gt'].unsqueeze(0)
+            'gt': [gt.unsqueeze(0) for gt in sample['gt']]
         }
         sample.update(rdict)
         return sample

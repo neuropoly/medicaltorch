@@ -160,7 +160,7 @@ class SegmentationPair2D(object):
             if gt is not None:
                 gt_data.append(gt.get_fdata(cache_mode, dtype=np.float32))
             else:
-                gt_data.append(np.zeros(self.input_handle[0].shape))
+                gt_data.append(np.zeros(self.input_handle[0].shape, dtype=np.float32))
 
         return input_data, gt_data
 
