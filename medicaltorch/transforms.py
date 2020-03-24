@@ -329,11 +329,13 @@ class NormalizeInstance(MTTransform):
         input_data = sample['input']
         if isinstance(input_data, list):
             for i in range(len(input_data)):
-                mean, std = input_data[i].mean(), input_data[i].std()
-                input_data[i] = F.normalize(input_data[i], [mean], [std])
+                if input_data[i].type(torch.bool).any():
+                    mean, std = input_data[i].mean(), input_data[i].std()
+                    input_data[i] = F.normalize(input_data[i], [mean], [std])
         else:
-            mean, std = input_data.mean(), input_data.std()
-            input_data = F.normalize(input_data, [mean], [std])
+            if input_data.type(torch.bool).any():
+                mean, std = input_data.mean(), input_data.std()
+                input_data = F.normalize(input_data, [mean], [std])
         
         rdict = {
             'input': input_data,
