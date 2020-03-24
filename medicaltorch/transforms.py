@@ -131,7 +131,7 @@ class StackTensors(MTTransform):
             sample.update(rdict)
         if isinstance(sample['gt'], list):
             gt_data = sample['gt']
-            rdict['gt'] = torch.squeeze(torch.cat(gt_data, dim=0))
+            rdict['gt'] = torch.cat(gt_data, dim=0)
             sample.update(rdict)
         return sample
 
