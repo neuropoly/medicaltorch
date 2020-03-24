@@ -240,9 +240,7 @@ class CenterCrop2D(Crop2D):
         else:
             rdict['input'] = self._uncrop(sample['input'], sample['input_metadata']["__centercrop"])
 
-        if self.labeled:
-            rdict['gt'] = self._uncrop(sample['gt'], sample['gt_metadata']["__centercrop"])
-
+        rdict['gt'] = self._uncrop(sample['gt'], sample['gt_metadata']["__centercrop"])
         sample.update(rdict)
         return sample
 
