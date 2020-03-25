@@ -118,7 +118,7 @@ class SegmentationPair2D(object):
         if self.metadata:
             self.metadata = []
             for data, input_filename in zip(metadata, input_filenames):
-                data["input_filename"] = input_filename
+                data["input_filenames"] = input_filename
                 data["gt_filenames"] = gt_filenames
                 self.metadata.append(data)
 
@@ -220,9 +220,11 @@ class SegmentationPair2D(object):
                     gt_meta_dict.append(SampleMetadata({
                         "zooms": gt.header.get_zooms()[:2],
                         "data_shape": gt.header.get_data_shape()[:2],
+                        "gt_filenames": self.metadata[0]["gt_filenames"]
                     }))
                 else:
-                    gt_meta_dict.append(None)
+                    gt_meta_dict.append(SampleMetadata({
+                    }))
 
         input_meta_dict = []
         for handle in self.input_handle:
@@ -365,27 +367,35 @@ class MRI2DSegmentationDataset(Dataset):
 
             input_img = Image.fromarray(input_slice, mode='F')
             input_tensors.append(input_img)
-            input_metadata.append(seg_pair_slice['input_metadata'][idx])
 
-        # Handle unlabeled data
-        if seg_pair_slice["gt"] is None:
-            gt_img = None
-        else:
-            gt_img = (seg_pair_slice["gt"] * 255).astype(np.uint8)
-            gt_img = Image.fromarray(gt_img, mode='L')
+        gt_img = []
+        for gt_slice in seg_pair_slice["gt"]:
+            # Handle unlabeled data
+            if gt_slice is None:
+                gt_img.append(None)
+            else:
+                gt_scaled = (gt_slice * 255).astype(np.uint8)
+                gt_img.append(Image.fromarray(gt_scaled, mode='L'))
 
-        # Handle data with no ROI provided
-        if roi_pair_slice["gt"] is None:
+        if not len(roi_pair_slice['gt']):
             roi_img = None
+            roi_pair_slice['gt_metadata'] = None
         else:
-            roi_img = (roi_pair_slice["gt"] * 255).astype(np.uint8)
-            roi_img = Image.fromarray(roi_img, mode='L')
+            roi_img = []
+            
+        for roi_slice in roi_pair_slice["gt"]:
+            # Handle data with no ROI provided
+            if roi_pair_slice["gt"] is None:
+                roi_img.append(None)
+            else:
+                roi_scaled = (roi_pair_slice["gt"] * 255).astype(np.uint8)
+                roi_img.append(Image.fromarray(roi_scaled, mode='L'))
 
         data_dict = {
             'input': input_tensors,
             'gt': gt_img,
             'roi': roi_img,
-            'input_metadata': input_metadata,
+            'input_metadata': seg_pair_slice['input_metadata'],
             'gt_metadata': seg_pair_slice['gt_metadata'],
             'roi_metadata': roi_pair_slice['gt_metadata']
         }
