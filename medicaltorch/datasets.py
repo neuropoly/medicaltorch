@@ -101,7 +101,7 @@ class SegmentationPair2D(object):
         # Sanity check for dimensions, should be the same
         input_shape, gt_shape = self.get_pair_shapes()
 
-        if self.gt_filenames[0] is not None:
+        if self.gt_filenames is not None:
             if not np.allclose(input_shape, gt_shape):
                 raise RuntimeError('Input and ground truth with different dimensions.')
 
@@ -110,7 +110,7 @@ class SegmentationPair2D(object):
                 self.input_handle[idx] = nib.as_closest_canonical(handle)
 
             # Unlabeled data
-            if self.gt_filenames[0] is not None:
+            if self.gt_filenames is not None:
                 for idx, gt in enumerate(self.gt_handle):
                     if gt is not None:
                         self.gt_handle[idx] = nib.as_closest_canonical(gt)
