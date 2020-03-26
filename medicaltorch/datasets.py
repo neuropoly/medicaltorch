@@ -388,7 +388,7 @@ class MRI2DSegmentationDataset(Dataset):
             if roi_pair_slice["gt"] is None:
                 roi_img.append(None)
             else:
-                roi_scaled = (roi_pair_slice["gt"] * 255).astype(np.uint8)
+                roi_scaled = (roi_slice * 255).astype(np.uint8)
                 roi_img.append(Image.fromarray(roi_scaled, mode='L'))
 
         data_dict = {
