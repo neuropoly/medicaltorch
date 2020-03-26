@@ -55,9 +55,6 @@ class ToTensor(MTTransform):
             # single input
             ret_input = F.to_tensor(input_data[0])
 
-            # transform list of dic into single dic
-            rdict['input_metadata'] = sample['input_metadata'][0]
-
         rdict['input'] = ret_input
 
         if self.labeled:
@@ -86,9 +83,9 @@ class ToPIL(MTTransform):
         else:
             input_data_npy = sample_data
 
-        input_data_npy = np.transpose(input_data_npy, (1, 2, 0))
-        input_data_npy = np.squeeze(input_data_npy, axis=2)
-        input_data = Image.fromarray(input_data_npy, mode='F')
+        input_data = []
+        for img in input_data_npy:
+            input_data.append(Image.fromarray(img, mode='F'))
         return input_data
 
     def __call__(self, sample):
@@ -127,7 +124,7 @@ class StackTensors(MTTransform):
         rdict = {}
         if isinstance(sample['input'], list):
             input_data = sample['input']
-            rdict['input'] = torch.squeeze(torch.cat(input_data, dim=0))
+            rdict['input'] = torch.cat(input_data, dim=0)
             sample.update(rdict)
         if isinstance(sample['gt'], list):
             gt_data = sample['gt']
