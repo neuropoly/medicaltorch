@@ -158,9 +158,9 @@ class SegmentationPair2D(object):
             gt_data = None
         for gt in self.gt_handle:
             if gt is not None:
-                gt_data.append(gt.get_fdata(cache_mode, dtype=np.float32))
+                gt_data.append(gt.get_fdata(cache_mode, dtype=np.uint8))
             else:
-                gt_data.append(np.zeros(self.input_handle[0].shape, dtype=np.float32))
+                gt_data.append(np.zeros(self.input_handle[0].shape, dtype=np.uint8))
 
         return input_data, gt_data
 
@@ -206,13 +206,13 @@ class SegmentationPair2D(object):
             for gt_obj in gt_dataobj:
                 if slice_axis == 2:
                     gt_slices.append(np.asarray(gt_obj[..., slice_index],
-                                          dtype=np.float32))
+                                          dtype=np.uint8))
                 elif slice_axis == 1:
                     gt_slices.append(np.asarray(gt_obj[:, slice_index, ...],
-                                          dtype=np.float32))
+                                          dtype=np.uint8))
                 elif slice_axis == 0:
                     gt_slices.append(np.asarray(gt_obj[slice_index, ...],
-                                          dtype=np.float32))
+                                          dtype=np.uint8))
 
             gt_meta_dict = []
             for gt in self.gt_handle:

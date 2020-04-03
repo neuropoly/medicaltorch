@@ -225,12 +225,15 @@ class CenterCrop2D(Crop2D):
     def undo_transform(self, sample):
         rdict = {}
         if isinstance(sample['input'], list):
+            rdict['input'] = sample['input']
             for i in range(len(sample['input'])):
-                rdict['input'] = self._uncrop(sample['input'][i], sample['input_metadata'][i]["__centercrop"])
+                rdict['input'][i] = self._uncrop(sample['input'][i], sample['input_metadata']["__centercrop"])
         else:
             rdict['input'] = self._uncrop(sample['input'], sample['input_metadata']["__centercrop"])
 
-        rdict['gt'] = self._uncrop(sample['gt'], sample['gt_metadata']["__centercrop"])
+        rdict['gt'] = sample['gt']
+        for i in range(len(sample['gt'])):
+            rdict['gt'][i] = self._uncrop(sample['gt'][i], sample['input_metadata']["__centercrop"])
         sample.update(rdict)
         return sample
 
@@ -395,9 +398,16 @@ class RandomRotation(MTTransform):
 
     def __call__(self, sample):
         rdict = {}
+
+        input_data = sample['input']  # [0]
+
         angle = self.get_params(self.degrees)
+        # save angle in metadata
+        rdict['input_metadata'] = sample['input_metadata']
+
         input_lst = []
-        for input_data in sample['input']:
+        for idx, input_data in enumerate(sample['input']):
+            rdict['input_metadata'][idx]['randomRotation'] = angle
             input_lst.append(F.rotate(input_data, angle,
                                       self.resample, self.expand,
                                       self.center))
@@ -407,9 +417,35 @@ class RandomRotation(MTTransform):
             gt_lst = []
             for gt_data in sample['gt']:
                 gt_lst.append(F.rotate(gt_data, angle,
-                                          self.resample, self.expand,
-                                          self.center))
+                                       self.resample, self.expand,
+                                       self.center))
             rdict['gt'] = gt_lst
+
+        sample.update(rdict)
+        return sample
+
+    def undo_transform(self, sample):
+        rdict = {}
+
+        if isinstance(sample['input'], list):
+            angle = - sample['input_metadata']['randomRotation']
+
+            rdict['input'] = sample['input']
+            for i in range(len(sample['input'])):
+                rdict['input'][i] = F.rotate(sample['input'][i], angle,
+                                             self.resample, self.expand,
+                                             self.center)
+        else:
+            angle = - sample['input_metadata']['randomRotation']
+
+            rdict['input'] = F.rotate(sample['input'], angle,
+                                      self.resample, self.expand,
+                                      self.center)
+        rdict['gt'] = sample['gt']
+        for i in range(len(sample['gt'])):
+            rdict['gt'][i] = F.rotate(sample['gt'][i], angle,
+                                   self.resample, self.expand,
+                                   self.center)
 
         sample.update(rdict)
         return sample
@@ -446,6 +482,7 @@ class RandomRotation3D(MTTransform):
             raise ValueError("Input of RandomRotation3D should be a 3 dimensionnal tensor.")
 
         angle = self.get_params(self.degrees)
+
         input_rotated = [np.zeros(input_data[0].shape, dtype=input_data.dtype) for i in range(len(input_data))]
         gt_data = sample['gt'] if self.labeled else None
         gt_rotated = np.zeros(gt_data.shape, dtype=gt_data.dtype) if self.labeled else None
@@ -469,6 +506,7 @@ class RandomRotation3D(MTTransform):
         rdict['input'] = input_rotated
         if self.labeled:
             rdict['gt'] = gt_rotated
+
         sample.update(rdict)
 
         return sample
