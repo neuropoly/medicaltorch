@@ -69,10 +69,10 @@ class SegmentationPair2D(object):
     :param canonical: canonical reordering of the volume axes.
     """
 
-    def __init__(self, input_filenames, gt_filename, metadata=None, cache=True, canonical=False):
+    def __init__(self, input_filenames, gt_filenames, metadata=None, cache=True, canonical=False):
 
         self.input_filenames = input_filenames
-        self.gt_filename = gt_filename
+        self.gt_filenames = gt_filenames
         self.metadata = metadata
         self.canonical = canonical
         self.cache = cache
@@ -87,17 +87,21 @@ class SegmentationPair2D(object):
             if len(input_img.shape) > 3:
                 raise RuntimeError("4-dimensional volumes not supported.")
 
-        # we consider only one gt per patient
+        # list of GT for multiclass segmentation
+        self.gt_handle = []
+
         # Unlabeled data (inference time)
-        if self.gt_filename is None:
-            self.gt_handle = None
-        else:
-            self.gt_handle = nib.load(self.gt_filename)
+        if self.gt_filenames is not None:
+            for gt in self.gt_filenames:
+                if gt is not None:
+                    self.gt_handle.append(nib.load(gt))
+                else:
+                    self.gt_handle.append(None)
 
         # Sanity check for dimensions, should be the same
         input_shape, gt_shape = self.get_pair_shapes()
 
-        if self.gt_handle is not None:
+        if self.gt_filenames is not None:
             if not np.allclose(input_shape, gt_shape):
                 raise RuntimeError('Input and ground truth with different dimensions.')
 
@@ -106,14 +110,16 @@ class SegmentationPair2D(object):
                 self.input_handle[idx] = nib.as_closest_canonical(handle)
 
             # Unlabeled data
-            if self.gt_handle is not None:
-                self.gt_handle = nib.as_closest_canonical(self.gt_handle)
+            if self.gt_filenames is not None:
+                for idx, gt in enumerate(self.gt_handle):
+                    if gt is not None:
+                        self.gt_handle[idx] = nib.as_closest_canonical(gt)
 
         if self.metadata:
             self.metadata = []
             for data, input_filename in zip(metadata, input_filenames):
-                data["input_filename"] = input_filename
-                data["gt_filename"] = gt_filename
+                data["input_filenames"] = input_filename
+                data["gt_filenames"] = gt_filenames
                 self.metadata.append(data)
 
     def get_pair_shapes(self):
@@ -126,13 +132,16 @@ class SegmentationPair2D(object):
             if not len(set(input_shape)):
                 raise RuntimeError('Inputs have different dimensions.')
 
-        # Handle unlabeled data
-        if self.gt_handle is None:
-            gt_shape = None
-        else:
-            gt_shape = self.gt_handle.header.get_data_shape()
+        gt_shape = []
+            
+        for gt in self.gt_handle:
+            if gt is not None:
+                gt_shape.append(gt.header.get_data_shape())
 
-        return input_shape[0], gt_shape
+                if not len(set(gt_shape)):
+                    raise RuntimeError('Labels have different dimensions.')
+
+        return input_shape[0], gt_shape[0] if len(gt_shape) else None
 
     def get_pair_data(self):
         """Return the tuble (input, ground truth) with the data content in
@@ -143,11 +152,15 @@ class SegmentationPair2D(object):
         for handle in self.input_handle:
             input_data.append(handle.get_fdata(cache_mode, dtype=np.float32))
 
+        gt_data = []
         # Handle unlabeled data
         if self.gt_handle is None:
             gt_data = None
-        else:
-            gt_data = self.gt_handle.get_fdata(cache_mode, dtype=np.float32)
+        for gt in self.gt_handle:
+            if gt is not None:
+                gt_data.append(gt.get_fdata(cache_mode, dtype=np.float32))
+            else:
+                gt_data.append(np.zeros(self.input_handle[0].shape, dtype=np.float32))
 
         return input_data, gt_data
 
@@ -166,43 +179,52 @@ class SegmentationPair2D(object):
             if self.gt_handle is None:
                 gt_dataobj = None
             else:
-                gt_dataobj = self.gt_handle.dataobj
+                gt_dataobj = [gt.dataobj for gt in self.gt_handle]
 
         if slice_axis not in [0, 1, 2]:
             raise RuntimeError("Invalid axis, must be between 0 and 2.")
 
-        input_slice = []
+        input_slices = []
         # Loop over modalities
         for data_object in input_dataobj:
             if slice_axis == 2:
-                input_slice.append(np.asarray(data_object[..., slice_index],
+                input_slices.append(np.asarray(data_object[..., slice_index],
                                               dtype=np.float32))
             elif slice_axis == 1:
-                input_slice.append(np.asarray(data_object[:, slice_index, ...],
+                input_slices.append(np.asarray(data_object[:, slice_index, ...],
                                               dtype=np.float32))
             elif slice_axis == 0:
-                input_slice.append(np.asarray(data_object[slice_index, ...],
+                input_slices.append(np.asarray(data_object[slice_index, ...],
                                               dtype=np.float32))
 
         # Handle the case for unlabeled data
         gt_meta_dict = None
         if self.gt_handle is None:
-            gt_slice = None
+            gt_slices = None
         else:
-            if slice_axis == 2:
-                gt_slice = np.asarray(gt_dataobj[..., slice_index],
-                                      dtype=np.float32)
-            elif slice_axis == 1:
-                gt_slice = np.asarray(gt_dataobj[:, slice_index, ...],
-                                      dtype=np.float32)
-            elif slice_axis == 0:
-                gt_slice = np.asarray(gt_dataobj[slice_index, ...],
-                                      dtype=np.float32)
+            gt_slices = []
+            for gt_obj in gt_dataobj:
+                if slice_axis == 2:
+                    gt_slices.append(np.asarray(gt_obj[..., slice_index],
+                                          dtype=np.float32))
+                elif slice_axis == 1:
+                    gt_slices.append(np.asarray(gt_obj[:, slice_index, ...],
+                                          dtype=np.float32))
+                elif slice_axis == 0:
+                    gt_slices.append(np.asarray(gt_obj[slice_index, ...],
+                                          dtype=np.float32))
 
-            gt_meta_dict = SampleMetadata({
-                "zooms": self.gt_handle.header.get_zooms()[:2],
-                "data_shape": self.gt_handle.header.get_data_shape()[:2],
-            })
+            gt_meta_dict = []
+            for gt in self.gt_handle:
+                if gt is not None:
+                    gt_meta_dict.append(SampleMetadata({
+                        "zooms": gt.header.get_zooms()[:2],
+                        "data_shape": gt.header.get_data_shape()[:2],
+                        "gt_filenames": self.metadata[0]["gt_filenames"]
+                    }))
+                else:
+                    gt_meta_dict.append(SampleMetadata({
+                    }))
 
         input_meta_dict = []
         for handle in self.input_handle:
@@ -212,8 +234,8 @@ class SegmentationPair2D(object):
             }))
 
         dreturn = {
-            "input": input_slice,
-            "gt": gt_slice,
+            "input": input_slices,
+            "gt": gt_slices,
             "input_metadata": input_meta_dict,
             "gt_metadata": gt_meta_dict,
         }
@@ -253,11 +275,11 @@ class MRI2DSegmentationDataset(Dataset):
         self._load_filenames()
 
     def _load_filenames(self):
-        for input_filename, gt_filename, roi_filename, metadata in self.filename_pairs:
-            roi_pair = SegmentationPair2D(input_filename, roi_filename, metadata=metadata,
+        for input_filenames, gt_filenames, roi_filename, metadata in self.filename_pairs:
+            roi_pair = SegmentationPair2D(input_filenames, roi_filename, metadata=metadata,
                                           cache=self.cache, canonical=self.canonical)
 
-            seg_pair = SegmentationPair2D(input_filename, gt_filename, metadata=metadata,
+            seg_pair = SegmentationPair2D(input_filenames, gt_filenames, metadata=metadata,
                                           cache=self.cache, canonical=self.canonical)
 
             input_data_shape, _ = seg_pair.get_pair_shapes()
@@ -345,27 +367,35 @@ class MRI2DSegmentationDataset(Dataset):
 
             input_img = Image.fromarray(input_slice, mode='F')
             input_tensors.append(input_img)
-            input_metadata.append(seg_pair_slice['input_metadata'][idx])
 
-        # Handle unlabeled data
-        if seg_pair_slice["gt"] is None:
-            gt_img = None
-        else:
-            gt_img = (seg_pair_slice["gt"] * 255).astype(np.uint8)
-            gt_img = Image.fromarray(gt_img, mode='L')
+        gt_img = []
+        for gt_slice in seg_pair_slice["gt"]:
+            # Handle unlabeled data
+            if gt_slice is None:
+                gt_img.append(None)
+            else:
+                gt_scaled = (gt_slice * 255).astype(np.uint8)
+                gt_img.append(Image.fromarray(gt_scaled, mode='L'))
 
-        # Handle data with no ROI provided
-        if roi_pair_slice["gt"] is None:
+        if not len(roi_pair_slice['gt']):
             roi_img = None
+            roi_pair_slice['gt_metadata'] = None
         else:
-            roi_img = (roi_pair_slice["gt"] * 255).astype(np.uint8)
-            roi_img = Image.fromarray(roi_img, mode='L')
+            roi_img = []
+            
+        for roi_slice in roi_pair_slice["gt"]:
+            # Handle data with no ROI provided
+            if roi_pair_slice["gt"] is None:
+                roi_img.append(None)
+            else:
+                roi_scaled = (roi_slice * 255).astype(np.uint8)
+                roi_img.append(Image.fromarray(roi_scaled, mode='L'))
 
         data_dict = {
             'input': input_tensors,
             'gt': gt_img,
             'roi': roi_img,
-            'input_metadata': input_metadata,
+            'input_metadata': seg_pair_slice['input_metadata'],
             'gt_metadata': seg_pair_slice['gt_metadata'],
             'roi_metadata': roi_pair_slice['gt_metadata']
         }
@@ -466,7 +496,6 @@ class MRI3DSubVolumeSegmentationDataset(MRI3DSegmentationDataset):
         self.padding = padding
         self.transform = transform
         self._prepare_indexes()
-        self._load_filenames()
 
     def _prepare_indexes(self):
         length = self.length
@@ -514,7 +543,7 @@ class MRI3DSubVolumeSegmentationDataset(MRI3DSegmentationDataset):
         """
         coord = self.indexes[index]
         input_img, gt_img = self.handlers[coord['handler_index']].get_pair_data()
-        data_shape = gt_img.shape
+        data_shape = gt_img[0].shape
         seg_pair_slice = self.handlers[coord['handler_index']].get_pair_slice(coord['handler_index'])
         data_dict = {
             'input': input_img,
@@ -526,11 +555,13 @@ class MRI3DSubVolumeSegmentationDataset(MRI3DSegmentationDataset):
                                       coord['y_min']:coord['y_max'],
                                       coord['z_min']:coord['z_max']]
 
-        data_dict['gt'] = data_dict['gt'][coord['x_min']:coord['x_max'],
-                          coord['y_min']:coord['y_max'],
-                          coord['z_min']:coord['z_max']]
+        for idx in range(len(data_dict['gt'])):
+            data_dict['gt'][idx] = data_dict['gt'][idx][coord['x_min']:coord['x_max'],
+                              coord['y_min']:coord['y_max'],
+                              coord['z_min']:coord['z_max']]
 
         data_dict['input_metadata'] = seg_pair_slice['input_metadata']
+        data_dict['gt_metadata'] = seg_pair_slice['gt_metadata']
         for idx in range(len(data_dict["input"])):
             data_dict['input_metadata'][idx]['data_shape'] = data_shape
         if self.transform is not None:
