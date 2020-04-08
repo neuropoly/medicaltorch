@@ -227,13 +227,13 @@ class CenterCrop2D(Crop2D):
         if isinstance(sample['input'], list):
             rdict['input'] = sample['input']
             for i in range(len(sample['input'])):
-                rdict['input'][i] = self._uncrop(sample['input'][i], sample['input_metadata'][i]["__centercrop"])
+                rdict['input'][i] = self._uncrop(sample['input'][i], sample['input_metadata']["__centercrop"])
         else:
             rdict['input'] = self._uncrop(sample['input'], sample['input_metadata']["__centercrop"])
 
         rdict['gt'] = sample['gt']
         for i in range(len(sample['gt'])):
-            rdict['gt'][i] = self._uncrop(sample['gt'][i], sample['input_metadata'][i]["__centercrop"])
+            rdict['gt'][i] = self._uncrop(sample['gt'][i], sample['input_metadata']["__centercrop"])
         sample.update(rdict)
         return sample
 
