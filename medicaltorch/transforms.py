@@ -68,6 +68,7 @@ class ToTensor(MTTransform):
                     ret_gt = F.to_tensor(gt_data)
 
                 rdict['gt'] = ret_gt
+                
         sample.update(rdict)
         return sample
 
