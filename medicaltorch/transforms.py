@@ -61,8 +61,13 @@ class ToTensor(MTTransform):
             gt_data = sample['gt']
             if gt_data is not None:
                 if isinstance(gt_data, list):
+                    # Add dim 0 for 3D images
+                    if gt_data[0].size == 3:
+                        ret_gt = [gt.unsqueeze(0) for gt in sample['gt']]
+
                     # multiple GT
-                    ret_gt = [F.to_tensor(item) for item in gt_data]
+                    ret_gt = torch.cat([F.to_tensor(item) for item in gt_data], dim=0)
+
                 else:
                     # single GT
                     ret_gt = F.to_tensor(gt_data)
@@ -367,8 +372,7 @@ class NormalizeInstance3D(MTTransform):
                                                     [mean for _ in range(0, input_volume.shape[0])],
                                                     [std for _ in range(0, input_volume.shape[0])]).unsqueeze(0)
         rdict = {
-            'input': input_data_normalized,
-            'gt': [gt.unsqueeze(0) for gt in sample['gt']]
+            'input': input_data_normalized
         }
         sample.update(rdict)
         return sample
